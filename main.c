@@ -41,6 +41,7 @@ void ack_send_cli( tftp_t * instance ) {
     off_t offset;
 
     /* Asignamos -1 a blknum en caso de ser 65535 para evitar un rango incorrecto en los ack */
+
     if ( instance->blknum == 65535 ) instance->blknum = 0;
 
     /* Esperamos el siguiente msg */
@@ -54,20 +55,16 @@ void ack_send_cli( tftp_t * instance ) {
 
     /* Verificamos que haya llegado un msg válido, se debe cumplir: */
     /* 1. Que received sea distinto a -1 */
-    /* 2. Que el OPCODE sea OPCODE_DATA */
-    /* 3. Que el blknum sea el que esperamos */
-    /* 4. Que received sea distinto de EWOLDBLOCK */
+    /* 2. Que received sea distinto a  EWOULDBLOCK*/
+    /* 3. Que el OPCODE sea OPCODE_DATA */
+    /* 4. Que el blknum sea el que esperamos */
 
-    /*
-    puts("====================RECIBIDO==========================");
-    printf("blknum: %d, received: %d, EWOULDBLOCK: %d", (instance->buf[2] << 8) + instance->buf[3] , received, EWOULDBLOCK);
-    printf("\n MIO> instance->blknum: %d, " , instance->blknum);
-    puts("\n======================================================");*******/
 
     if ( received != -1
+         && received != EWOULDBLOCK
          && ( (instance->buf[0] << 8) + instance->buf[1]  == OPCODE_DATA )
          && ( (instance->buf[2] << 8) + instance->buf[3]  == instance->blknum + 1)
-         && received != EWOULDBLOCK) {
+         ) {
         instance->retries = 0;
 
         /* Procesamos los datos recibidos */
@@ -161,9 +158,12 @@ void start_rrq( tftp_t * instance ){
     ssize_t sent, received;
 
     /* Comprobamos si hay errores */
+
     if ( access( ".", W_OK ) != 0 ) {
-        printf("ERROR There is no permissions to write.");
+
+        printf("ERROR There are no permissions to write.\n");
         _exit( EXIT_FAILURE );
+
     }
 
     build_request( instance, OPCODE_RRQ);
@@ -177,24 +177,21 @@ void start_rrq( tftp_t * instance ){
                    (struct sockaddr *) &instance->remote_addr,
                    instance->size_remote );
 
-    printf("start_rrq sent: %d ", sent);
-
-    if( sent != MAX_BUFSIZE ){
+    if ( sent != MAX_BUFSIZE ) {
         printf("ERROR Sending write request %s", strerror( errno) );
         _exit( EXIT_FAILURE );
     }
 
-    /* Iniciamos el temporizador */
-
-    instance->timeout.tv_sec = DEF_TIMEOUT_SEC;
-    instance->timeout.tv_usec = DEF_TIMEOUT_USEC;
+    /* Asignamos el temporizador para que el socket envía señal cada vez que llega (o no) algo */
 
     if ( setsockopt( instance->local_descriptor,
                      SOL_SOCKET,
                      SO_RCVTIMEO,
                      (char *)&instance->timeout,
-                     sizeof(instance->timeout)) < 0 )
-        printf( "ERROR Sending write request (setsockopt) %s \n", strerror( errno ) );
+                     sizeof(instance->timeout)) < 0 ){
+        _exit(EXIT_FAILURE);
+    }
+
 
     /* Inicializamos las variables a usar */
 
@@ -206,16 +203,18 @@ void start_rrq( tftp_t * instance ){
         ack_send_cli( instance );
 }
 
-void evaluate_options( char * ip , int type, char * file){
+void evaluate_options( char * ip , int type, char * file) {
 
     tftp_t * instance;
     instance = malloc( sizeof( struct tftp ) );
 
     //Inicializaciones generales
 
-    if( !instance ){
+    if ( !instance ) {
+
         printf("ERROR Creating Client instance", strerror(errno));
         _exit( EXIT_FAILURE );
+
     }
 
     instance->mode = MODE_OCTET;
@@ -227,9 +226,11 @@ void evaluate_options( char * ip , int type, char * file){
 
     memset( &instance->remote_addr, 0, sizeof( struct sockaddr_in ) );
 
-    if( inet_pton( AF_INET, ip, &instance->remote_addr ) != 1){
+    if ( inet_pton( AF_INET, ip, &instance->remote_addr ) != 1){
+
         printf("ERROR Parsing IPv4 server address %s", strerror(errno));
         _exit( EXIT_FAILURE );
+
     }
 
     instance->remote_addr.sin_family = AF_INET;
@@ -240,32 +241,33 @@ void evaluate_options( char * ip , int type, char * file){
     memset( &instance->local_addr, 0, sizeof( struct sockaddr_in ) );
     instance->local_descriptor = socket( AF_INET, SOCK_DGRAM, 0 );
 
-    if( instance->local_descriptor == -1){
+    if ( instance->local_descriptor == -1 )  {
+
         printf("ERROR Creating Client socket %s", strerror(errno));
         _exit( EXIT_FAILURE);
+
     }
 
     instance->local_addr.sin_family = AF_INET;
     instance->local_addr.sin_addr.s_addr = INADDR_ANY;
-    //instance->local_addr.sin_port = htons(0);
+    instance->local_addr.sin_port = htons(0);
 
     if ( bind( instance->local_descriptor,
                (struct sockaddr *) &instance->local_addr,
                sizeof(struct sockaddr_in))  == -1 )
-        printf("ERROR Binding Client socket %s", strerror(errno) );
+        printf("ERROR Binding Client socket %s\n", strerror(errno) );
 
     /* Se ejecuta la peticion dependiendo del tipo que sea */
 
-    if( OPCODE_RRQ == type )
+    if ( OPCODE_RRQ == type )
         start_rrq( instance );
-
     else
         start_wrq( instance );
 
     free( instance );
 }
 
-int main(int argc, char ** argv){
+int main(int argc, char ** argv) {
 
     int address_flag=0, get_flag=0, put_flag=0, index=0, c, are_there_errors=0;
     char *address_value = NULL, *get_value = NULL, *put_value = NULL;
@@ -298,13 +300,13 @@ int main(int argc, char ** argv){
             are_there_errors = 1;
 
             if ( optopt == 'a' || optopt == 'g'  || optopt == 'p' )
-                fprintf(stderr, "Option -%c requires an argument.\n", optopt);
+                fprintf( stderr, "Option -%c requires an argument.\n", optopt );
             else if ( isprint (optopt)) // isprint() Verifica si un caracter es imprimible
-                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                fprintf ( stderr, "Unknown option `-%c'.\n", optopt );
             else
-                fprintf (stderr,
-                         "Unknown option character `\\x%x'.\n",
-                         optopt);
+                fprintf ( stderr,
+                          "Unknown option character `\\x%x'.\n",
+                          optopt );
             return EXIT_FAILURE;
 
         default:
@@ -312,12 +314,12 @@ int main(int argc, char ** argv){
             abort();
         }
 
-    for ( index = optind; index < argc; index++) {
+    for ( index = optind; index < argc; index++ ) {
         printf ("Non-option argument %s\n", argv[index]);
         are_there_errors=1;
     }
 
-    //Si la sintaxis es correcta, se verifica que los argumentos tengan sentido ... y magnitud
+    //Si la sintaxis es correcta, se verifica que los argumentos tengan sentido
 
     if (  !are_there_errors ) {
 
