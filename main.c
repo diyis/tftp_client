@@ -1,14 +1,15 @@
 #include <ctype.h>  //Declares several functions that are useful for testing and mapping characters.
 #include "tftp.h"
+#include "cmdline.h"
 
 #define CLIENT_NAME "client"
 
-/* _exit_free
-   Libera los punteros enviados y se sale del programa
+/*  _exit_free
+    Libera los punteros enviados y se sale del programa
 
-   type: tipo de salida, EXIT_SUCCESS o EXIT_FAILURE
-   params: cantidad de parámetros
-   ... : los parámetros en si
+    type: tipo de salida, EXIT_SUCCESS o EXIT_FAILURE
+    params: cantidad de parámetros
+    ... : los parámetros en si
 */
 
 void _exit_free ( int type, int params, ... ) {
@@ -61,15 +62,15 @@ void data_send_cli ( tftp_t *instance ) {
     // Primero se espera el ACK del servidor y luego se responde un DATA
 
     received = recvfrom (
-        instance->local_descriptor, instance->buf, MAX_BUFSIZE, 0,
-        ( struct sockaddr * ) &instance->remote_addr, &instance->size_remote );
+                instance->local_descriptor, instance->buf, MAX_BUFSIZE, 0,
+                ( struct sockaddr * ) &instance->remote_addr, &instance->size_remote );
 
     /*
-      Verificamos que haya llegado un msg válido, se debe cumplir:
-      1. Que received sea distinto a -1
-      2. Que el OPCODE sea OPCODE_ACK
-      3. Que el ack corresponda al blknum que esperamos
-      4. Que no haya expirado el socket
+        Verificamos que haya llegado un msg válido, se debe cumplir:
+        1. Que received sea distinto a -1
+        2. Que el OPCODE sea OPCODE_ACK
+        3. Que el ack corresponda al blknum que esperamos
+        4. Que no haya expirado el socket
     */
 
     if ( received != -1
@@ -77,8 +78,8 @@ void data_send_cli ( tftp_t *instance ) {
          && ( ( instance->buf[2] << 8 ) + instance->buf[3] == instance->blknum )
          && received != EWOULDBLOCK
          /*&& ( instance->tid == ntohs( instance->remote_addr.sin_port ) )*/ ) {
-        /* Si hemos enviado el último msg y recibido el último ack, terminamos
-         */
+        /*  Si hemos enviado el último msg y recibido el último ack, terminamos
+        */
 
         if ( offset < BUFSIZE ) {
             printf ( "File %s sent successful\n", instance->file );
@@ -104,9 +105,9 @@ void data_send_cli ( tftp_t *instance ) {
 
         instance->blknum++;
 
-        /* Si el blknum es 65536, le asignamos el valor 0 para no salirnos del
-           rango
-           de 2 bytes de la trama para el campo blknum */
+        /*  Si el blknum es 65536, le asignamos el valor 0 para no salirnos del
+            rango
+            de 2 bytes de la trama para el campo blknum */
 
         if ( instance->blknum == 65536 )
             instance->blknum = 0;
@@ -134,6 +135,7 @@ void data_send_cli ( tftp_t *instance ) {
         offset = read ( instance->fd, instance->msg, BUFSIZE );
 
         timeout = false;
+
     } else
         offset = read ( instance->fd, instance->msg, BUFSIZE );
 
@@ -144,8 +146,8 @@ void data_send_cli ( tftp_t *instance ) {
     /* Enviamos el msg */
 
     sent = sendto (
-        instance->local_descriptor, instance->buf, ACK_BUFSIZE + offset, 0,
-        ( struct sockaddr * ) &instance->remote_addr, instance->size_remote );
+                instance->local_descriptor, instance->buf, ACK_BUFSIZE + offset, 0,
+                ( struct sockaddr * ) &instance->remote_addr, instance->size_remote );
 
     /* Verificamos que se haya enviado correctamente */
 
@@ -178,7 +180,7 @@ void start_wrq ( tftp_t *instance ) {
 
     instance->blknum = 0;
     instance->fd     = open ( instance->file, O_WRONLY | O_CREAT | O_TRUNC,
-                          S_IRWXU | S_IRWXG | S_IRWXO );
+                              S_IRWXU | S_IRWXG | S_IRWXO );
 
     if ( setsockopt ( instance->local_descriptor, SOL_SOCKET, SO_RCVTIMEO,
                       ( char * ) &instance->timeout,
@@ -205,8 +207,8 @@ void ack_send_cli ( tftp_t *instance ) {
     ssize_t received;
     off_t   offset;
 
-    /* Asignamos -1 a blknum en caso de ser 65535 para evitar un rango
-     * incorrecto en los ack */
+    /*  Asignamos -1 a blknum en caso de ser 65535 para evitar un rango
+        incorrecto en los ack */
 
     if ( instance->blknum == 65535 )
         instance->blknum = 0;
@@ -214,8 +216,8 @@ void ack_send_cli ( tftp_t *instance ) {
     /* Esperamos el siguiente msg */
 
     received = recvfrom (
-        instance->local_descriptor, instance->buf, MAX_BUFSIZE, 0,
-        ( struct sockaddr * ) &instance->remote_addr, &instance->size_remote );
+                instance->local_descriptor, instance->buf, MAX_BUFSIZE, 0,
+                ( struct sockaddr * ) &instance->remote_addr, &instance->size_remote );
 
     /* Verificamos que haya llegado un msg válido, se debe cumplir: */
     /* 1. Que received sea distinto a -1 */
@@ -331,8 +333,8 @@ void start_rrq ( tftp_t *instance ) {
         _exit ( EXIT_FAILURE );
     }
 
-    /* Asignamos el temporizador para que el socket envía señal cada vez que
-     * llega (o no) algo */
+    /*  Asignamos el temporizador para que el socket envía señal cada vez que
+        llega (o no) algo */
 
     if ( setsockopt ( instance->local_descriptor, SOL_SOCKET, SO_RCVTIMEO,
                       ( char * ) &instance->timeout,
@@ -347,7 +349,7 @@ void start_rrq ( tftp_t *instance ) {
 
     instance->blknum = 0;
     instance->fd     = open ( instance->file, O_WRONLY | O_CREAT | O_TRUNC,
-                          S_IRWXU | S_IRWXG | S_IRWXO );
+                              S_IRWXU | S_IRWXG | S_IRWXO );
 
     /* Seguimos */
     for ( ;; )
@@ -368,7 +370,8 @@ void start_protocol ( char *ip, int type, char *file ) {
     instance->mode        = MODE_OCTET;
     instance->size_remote = sizeof ( struct sockaddr_in );
     instance->size_local  = sizeof ( struct sockaddr_in );
-    instance->file        = file;
+    memset(instance->file, 0, 255);
+    strcpy(instance->file, file);
 
     // Costruimos socket del servidor
 
@@ -406,6 +409,7 @@ void start_protocol ( char *ip, int type, char *file ) {
 
     if ( OPCODE_RRQ == type )
         start_rrq ( instance );
+
     else
         start_wrq ( instance );
 
@@ -413,114 +417,73 @@ void start_protocol ( char *ip, int type, char *file ) {
 }
 
 int main ( int argc, char **argv ) {
-    int address_flag = 0, get_flag = 0, put_flag = 0, index = 0, c,
-        are_there_errors = 0;
-    char *address_value = NULL, *get_value = NULL, *put_value = NULL;
 
-    opterr = 0;
+    struct gengetopt_args_info args_info;
+    tftp_t instance;
+    /* Obtenemos las opciones de comando */
+    if (cmdline_parser (argc, argv, &args_info) != 0)
+        exit(EXIT_FAILURE) ;
 
-    /*
-      El while itera cada argumento y verifica que sean parametros aceptados, la
-      cadena "a:g:p:"
-      pasada a la función getopt significa que los parámetros -a, -b y -p
-      requien el paso de un valor.
-    */
+    /* Revisamos que sean mutuamente excluyentes get y put */
 
-    while ( ( c = getopt ( argc, argv, "a:g:p:" ) ) != -1 )
-        switch ( c ) {
-            case 'a':
-                address_flag  = 1;
-                address_value = optarg;
-                break;
+    if ( (args_info.get_given && args_info.put_given)  /* Que sean mutuamente excluyentes get y put */
+         || ( args_info.put_given && ( !strcmp(args_info.put_arg,"g") /* Que put no esté de la forma --put,-p  [g, --get, -g] */
+                                       || !strcmp(args_info.put_arg,"--get")
+                                       || !strcmp(args_info.put_arg,"-g")) )
+         || ( args_info.get_given && ( !strcmp(args_info.get_arg,"p") /* Que get no esté de la forma --get,-g  [p, --put, -p] */
+                                       || !strcmp(args_info.get_arg,"--put")
+                                       || !strcmp(args_info.get_arg,"-p") )) ) {
+        puts( "You only can put or get a file at a time, not both." );
+        exit(EXIT_FAILURE);
+    }
+    printf("Número de argumentos sin nombre: %d\n", args_info.inputs_num);
+    if ( args_info.get_given )
+        printf( "get: %s\n", args_info.get_arg);
 
-            case 'g':
-                get_flag  = 1;
-                get_value = optarg;
-                break;
+    if ( args_info.put_given )
+        printf( "put: %s\n", args_info.put_arg);
 
-            case 'p':
-                put_flag  = 1;
-                put_value = optarg;
-                break;
+    /* Revisamos que sea una dirección y puerto válidos */
+    /* Si no se especifica puerto, se usará el 69 */
 
-            case '?':
-                are_there_errors = 1;
-
-                if ( optopt == 'a' || optopt == 'g' || optopt == 'p' )
-                    fprintf ( stderr, "Option -%c requires an argument.\n",
-                              optopt );
-                else if ( isprint ( optopt ) )  // isprint() Verifica si un
-                                                // caracter es imprimible
-                    fprintf ( stderr, "Unknown option `-%c'.\n", optopt );
-                else
-                    fprintf ( stderr, "Unknown option character `\\x%x'.\n",
-                              optopt );
-                return EXIT_FAILURE;
-
-            default:
-                are_there_errors = 1;
-                abort ();
-        }
-
-    for ( index = optind; index < argc; index++ ) {
-        printf ( "Non-option argument %s\n", argv[index] );
-        are_there_errors = 1;
+    if ( args_info.inputs_num == 0 ) { /* Si no hay parámetros, no ha especificado la dirección del servidor */
+        puts( "You must specify a server IP address." );
+        exit(EXIT_FAILURE);
     }
 
-    // Si la sintaxis es correcta, se verifica que los argumentos tengan sentido
+    if (args_info.inputs_num <= 2) {  /* Solo nos interesan máximo dos parámetros, dirección y puerto. Si hay más, salimos */
 
-    if ( !are_there_errors ) {
-        if ( !address_flag ) {
-            are_there_errors = 1;
-            puts ( "You must specify a server IP address." );
-        }
+        for ( unsigned i = 0 ; i < args_info.inputs_num ; ++i ) { /* Deben ser en el orden "dirección puerto(opcional)" */
 
-        if ( get_flag && put_flag ) {
-            are_there_errors = 1;
-            puts ( "You can only specify -g OR -p at time." );
-        }
+            if ( i == 0) { /* Autenticamos la dirección del servidor */
 
-        if ( !( put_flag || get_flag ) ) {
-            are_there_errors = 1;
-            puts ( "You must specify some file to send or to receive." );
+                if ( inet_pton ( AF_INET, args_info.inputs[i], &instance.remote_addr ) != 1 ) {
+                    printf ( "Error parsing IPv4 server address %s\n", strerror ( errno ) );
+                    _exit ( EXIT_FAILURE );
+                }
+                printf("%s es una IP válida\n",args_info.inputs[i]);
+                //IP válida
+            }
+
+            if ( i == 1) { /* Verificamos que el puerto esté en un rango válido ( 0 - 65535) */
+                char *tmp;
+                int number = strtol(args_info.inputs[i], &tmp, 10);
+
+                if (  ( errno == ERANGE )
+                      || ( number <= 0 )
+                      || ( number >= 65535 ) ) {
+                    printf ( "Error parsing port server  %s\n", strerror ( errno ) );
+                    _exit ( EXIT_FAILURE );
+                }
+                printf("%d es un puerto válido\n",number);
+                //Puerto válido
+            }
         }
+    } else {
+        puts( "Too much arguments." );
+        exit(EXIT_FAILURE);
     }
 
-    if ( are_there_errors ) {
-        printf (
-            "USAGE: %s -a  $(IP_ADDRESS) { -g | -p } $(FILE_NAME)\n"
-            "-g get a file from server\n"
-            "-p put a file to server\n",
-            CLIENT_NAME );
-
-        _exit_free ( EXIT_FAILURE, 3, address_value, get_value, put_value );
-    }
-
-    // En caso de un put, verificar que el archivo pueda leerse correctamente
-
-    if ( put_flag ) {
-        if ( access ( put_value, F_OK ) != 0 ) {
-            puts ( "File not found." );
-            _exit_free ( EXIT_FAILURE, 3, address_value, get_value, put_value );
-        } else if ( access ( put_value, R_OK ) != 0 ) {
-            puts ( "No read permission." );
-            _exit_free ( EXIT_FAILURE, 3, address_value, get_value, put_value );
-        }
-    }
-
-    if ( get_flag )
-        start_protocol ( address_value, OPCODE_RRQ, get_value );
-    else
-        start_protocol ( address_value, OPCODE_WRQ, put_value );
-
-    free ( address_value );
-    free ( get_value );
-    free ( put_value );
-
+    cmdline_parser_free (&args_info); /* liberamos la memoria alojada */
     return EXIT_SUCCESS;
 }
-
-/*
-  COMO USARLO:  aún tengo que agregar esto a la opción --help o algo asi ...
-  $(exe) -a  $(IP_DIR) { -g | -p } $(FILE_NAME)
-*/
